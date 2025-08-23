@@ -2,6 +2,7 @@ import tkinter as tk
 import re
 import math
 
+# Function To Calculate Password Entropy
 def calculate_entropy(password):
     length = len(password)
     possible_characters = 0
@@ -21,6 +22,7 @@ def calculate_entropy(password):
     entropy = length * math.log2(possible_characters)
     return entropy
 
+# Function To Calculate Password Strength
 def check_strength(password):
     entropy = calculate_entropy(password)
 
@@ -30,6 +32,7 @@ def check_strength(password):
     has_special = bool(re.search(r'[^a-zA-Z0-9]', password))
     length_ok = len(password) >= 8
 
+    # Determine Password Rating
     if entropy < 28 or not length_ok or sum([has_lower, has_upper, has_digit, has_special]) < 2:
         strength = "Weak"
         color = "red"
@@ -42,11 +45,13 @@ def check_strength(password):
 
     return strength, entropy, color
 
+# Event Handler For Button
 def on_check():
     password = entry.get()
     strength, entropy, color = check_strength(password)
     result_label.config(text=f"{strength} (Entropy: {entropy:.2f} bits)", fg=color)
 
+# Tkinter GUI
 root = tk.Tk()
 root.title("Password Strength Checker")
 root.geometry("400x200")
