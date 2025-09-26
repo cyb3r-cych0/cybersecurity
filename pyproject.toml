@@ -1,6 +1,14 @@
-[project]
+[CyberSecurity]
 name = "passwordchecker"
 version = "0.1.0"
-description = "Add your description here"
+description = "Password Strength Checker is a Python desktop 
+                application that helps users evaluate the security of their passwords. 
+                It analyzes a password based on its length, complexity, and entropy 
+                (randomness) using regex patterns and an entropy formula.
+                The app provides an easy-to-use Tkinter-based GUI where users can
+                enter a password and instantly see its strength rated as Weak, 
+                Moderate, or Strong, with color-coded feedback.
+                This tool encourages users to create more secure passwords, 
+                reducing the risk of unauthorized access."
 requires-python = ">=3.13"
 dependencies = []
