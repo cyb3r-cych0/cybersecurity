@@ -1,90 +1,68 @@
-import os
-import sys
-import time
-from collections import defaultdict
-from scapy.all import sniff, IP, TCP
+import tkinter as tk
+import re
+import math
 
-THRESHOLD = 40
-print(f"THRESHOLD: {THRESHOLD}")
+# Function to calculate entropy
+def calculate_entropy(password):
+    length = len(password)
+    possible_characters = 0
 
+    if re.search(r'[a-z]', password):
+        possible_characters += 26
+    if re.search(r'[A-Z]', password):
+        possible_characters += 26
+    if re.search(r'\d', password):
+        possible_characters += 10
+    if re.search(r'[^a-zA-Z0-9]', password):
+        possible_characters += 33  # Approx common special characters
 
-# Read IPs from a file
-def read_ip_file(filename):
-    with open(filename, "r") as file:
-        ips = [line.strip() for line in file]
-    return set(ips)
+    if possible_characters == 0:
+        return 0
 
+    entropy = length * math.log2(possible_characters)
+    return entropy
 
-# Check for Nimda worm signature
-def is_nimda_worm(packet):
-    if packet.haslayer(TCP) and packet[TCP].dport == 80:
-        payload = packet[TCP].payload
-        return "GET /scripts/root.exe" in str(payload)
-    return False
+# Function to check strength
+def check_strength(password):
+    entropy = calculate_entropy(password)
 
+    has_lower = bool(re.search(r'[a-z]', password))
+    has_upper = bool(re.search(r'[A-Z]', password))
+    has_digit = bool(re.search(r'\d', password))
+    has_special = bool(re.search(r'[^a-zA-Z0-9]', password))
+    length_ok = len(password) >= 8
 
-# Log events to a file
-def log_event(message):
-    log_folder = "logs"
-    os.makedirs(log_folder, exist_ok=True)
-    timestamp = time.strftime("%Y-%m-%d_%H-%M-%S", time.localtime())
-    log_file = os.path.join(log_folder, f"log_{timestamp}.txt")
+    # Determine rating
+    if entropy < 28 or not length_ok or sum([has_lower, has_upper, has_digit, has_special]) < 2:
+        strength = "Weak"
+        color = "red"
+    elif 28 <= entropy < 36:
+        strength = "Moderate"
+        color = "orange"
+    else:
+        strength = "Strong"
+        color = "green"
 
-    with open(log_file, "a") as file:
-        file.write(f"{message}\n")
+    return strength, entropy, color
 
+# Event handler for button
+def on_check():
+    password = entry.get()
+    strength, entropy, color = check_strength(password)
+    result_label.config(text=f"{strength} (Entropy: {entropy:.2f} bits)", fg=color)
 
-def packet_callback(packet):
-    src_ip = packet[IP].src
+# Tkinter GUI
+root = tk.Tk()
+root.title("Password Strength Checker")
+root.geometry("400x200")
 
-    # Check if IP is in the whitelist
-    if src_ip in whitelist_ips:
-        return
+tk.Label(root, text="Enter Password:", font=("Arial", 12)).pack(pady=10)
+entry = tk.Entry(root, show="*", width=30, font=("Arial", 12))
+entry.pack()
 
-    # Check if IP is in the blacklist
-    if src_ip in blacklist_ips:
-        os.system(f"iptables -A INPUT -s {src_ip} -j DROP")
-        log_event(f"Blocking blacklisted IP: {src_ip}")
-        return
+tk.Button(root, text="Check Strength", command=on_check, font=("Arial", 12)).pack(pady=10)
 
-    # Check for Nimda worm signature
-    if is_nimda_worm(packet):
-        print(f"Blocking Nimda source IP: {src_ip}")
-        os.system(f"iptables -A INPUT -s {src_ip} -j DROP")
-        log_event(f"Blocking Nimda source IP: {src_ip}")
-        return
+result_label = tk.Label(root, text="", font=("Arial", 12, "bold"))
+result_label.pack(pady=10)
 
-    packet_count[src_ip] += 1
-
-    current_time = time.time()
-    time_interval = current_time - start_time[0]
-
-    if time_interval >= 1:
-        for ip, count in packet_count.items():
-            packet_rate = count / time_interval
-
-            if packet_rate > THRESHOLD and ip not in blocked_ips:
-                print(f"Blocking IP: {ip}, packet rate: {packet_rate}")
-                os.system(f"iptables -A INPUT -s {ip} -j DROP")
-                log_event(f"Blocking IP: {ip}, packet rate: {packet_rate}")
-                blocked_ips.add(ip)
-
-        packet_count.clear()
-        start_time[0] = current_time
-
-
-if __name__ == "__main__":
-    if os.geteuid() != 0:
-        print("This script requires root privileges.")
-        sys.exit(1)
-
-    # Import whitelist and blacklist IPs
-    whitelist_ips = read_ip_file("whitelist.txt")
-    blacklist_ips = read_ip_file("blacklist.txt")
-
-    packet_count = defaultdict(int)
-    start_time = [time.time()]
-    blocked_ips = set()
-
-    print("Monitoring network traffic...")
-    sniff(filter="ip", prn=packet_callback)
+root.mainloop()
