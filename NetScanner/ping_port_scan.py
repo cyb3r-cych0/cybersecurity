@@ -32,13 +32,6 @@ def ping_sweep(network, netmask):
 
     return live_hosts
 
-# def scan_port(args):
-#     ip, port = args
-#     response = sr1(IP(dst=ip)/TCP(dport=port, flags="S"), timeout=1, verbose=0)
-#     if response is not None and response[TCP].flags == "SA":
-#         return port
-#     return None
-
 # Prevents: IndexError: Layer [TCP] not found
 def scan_port(args):
     ip, port = args
