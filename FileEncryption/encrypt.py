@@ -1,36 +1,51 @@
-from Crypto.Cipher import AES
-from Crypto.Random import get_random_bytes
-from Crypto.Util.Padding import pad
+import argparse
+import os
+import base64
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-def encrypt_file(file_path, key):
-    """Encrypts a file using AES in CBC mode."""
-    iv = get_random_bytes(AES.block_size)
-    cipher = AES.new(key, AES.MODE_CBC, iv)
+def derive_key(password, salt):
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+    )
+    return base64.urlsafe_b64encode(kdf.derive(password.encode()))
 
-    with open(file_path, 'rb') as f_in:
-        plaintext = f_in.read()
+def encrypt_file(file_path, password, key_file_path):
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"Input file '{file_path}' not found.")
     
-    padded_plaintext = pad(plaintext, AES.block_size)
-    ciphertext = cipher.encrypt(padded_plaintext)
-
+    salt = os.urandom(16)
+    key = derive_key(password, salt)
+    fernet = Fernet(key)
+    
+    with open(file_path, 'rb') as f:
+        data = f.read()
+    
+    encrypted = fernet.encrypt(data)
+    
     encrypted_file_path = file_path + ".enc"
-    with open(encrypted_file_path, 'wb') as f_out:
-        f_out.write(iv)
-        f_out.write(ciphertext)
+    with open(encrypted_file_path, 'wb') as f:
+        f.write(encrypted)
+    
+    with open(key_file_path, 'wb') as f:
+        f.write(base64.b64encode(salt))
+    
     print(f"File encrypted and saved as: {encrypted_file_path}")
-
-def save_key(key, key_file_path):
-    with open(key_file_path, 'w') as f:
-        f.write(key.hex())
-    print(f"Encryption key saved to: {key_file_path}")
+    print(f"Salt saved to: {key_file_path}")
 
 if __name__ == "__main__":
-    encryption_key = get_random_bytes(16) 
-
-    original_file = "secret.txt"
-    with open(original_file, 'w') as f:
-        f.write("This is a very secret message!")
-
-    encrypt_file(original_file, encryption_key)
-    save_key(encryption_key, "key.pom")
-    print(f"Encryption completed.")
+    parser = argparse.ArgumentParser(description="Encrypt a file using password-based key derivation.")
+    parser.add_argument("--file", required=True, help="Path to the file to encrypt.")
+    parser.add_argument("--password", required=True, help="Password for key derivation.")
+    parser.add_argument("--key-file", default="key.salt", help="Path to save the salt (default: key.salt).")
+    args = parser.parse_args()
+    
+    try:
+        encrypt_file(args.file, args.password, args.key_file)
+        print("Encryption completed successfully.")
+    except Exception as e:
+        print(f"Error during encryption: {e}")
